@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // TokenData represents the structure of the token file
@@ -16,6 +17,18 @@ type TokenData struct {
 	ExpiresIn string `json:"expires_in"`
 	UserID    string `json:"user_id"`
 	Username  string `json:"username"`
+}
+
+// Friend represents a friend in the friends list
+type Friend struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	AddedAt  string `json:"added_at"`
+}
+
+// FriendsData represents the structure of the friends file
+type FriendsData struct {
+	Friends []Friend `json:"friends"`
 }
 
 // MessageRequest represents the request payload for sending a message
@@ -49,24 +62,34 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Ask for recipient UID
-	fmt.Print("Enter recipient's UID: ")
-	var recipientUID string
-	fmt.Scanln(&recipientUID)
-
-	if recipientUID == "" {
-		fmt.Println("Recipient UID cannot be empty")
+	// Read friends from config file
+	friends, err := readFriendsFromConfig()
+	if err != nil {
+		fmt.Printf("Error reading friends: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Send message
-	err = sendMessage(token.Token, message, recipientUID)
+	// Check if friends list is empty
+	if len(friends.Friends) == 0 {
+		fmt.Println("No friends found in your friends list.")
+		os.Exit(1)
+	}
+
+	// Display friends and ask user to select
+	selectedFriend, err := selectFriend(friends)
+	if err != nil {
+		fmt.Printf("Error selecting friend: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Send message to selected friend
+	err = sendMessage(token.Token, message, selectedFriend.UserID)
 	if err != nil {
 		fmt.Printf("Error sending message: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("Message sent successfully!")
+	fmt.Printf("Message sent successfully to %s!\n", selectedFriend.Username)
 }
 
 // readTokenFromConfig reads the token from ~/.config/chat_app/token.json
@@ -96,6 +119,64 @@ func readTokenFromConfig() (*TokenData, error) {
 	}
 
 	return &tokenData, nil
+}
+
+// readFriendsFromConfig reads the friends list from ~/.config/chat_app/friends.json
+func readFriendsFromConfig() (*FriendsData, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %v", err)
+	}
+
+	friendsPath := filepath.Join(homeDir, ".config", "chat_app", "friends.json")
+	
+	file, err := os.Open(friendsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open friends file: %v", err)
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read friends file: %v", err)
+	}
+
+	var friendsData FriendsData
+	err = json.Unmarshal(data, &friendsData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse friends file: %v", err)
+	}
+
+	return &friendsData, nil
+}
+
+// selectFriend displays the friends list and asks user to select one
+func selectFriend(friends *FriendsData) (*Friend, error) {
+	fmt.Println("\n--- Your Friends ---")
+	for i, friend := range friends.Friends {
+		fmt.Printf("%d. %s (ID: %s)\n", i+1, friend.Username, friend.UserID)
+	}
+	
+	fmt.Print("\nEnter the number of the friend you want to send the message to: ")
+	var choice string
+	fmt.Scanln(&choice)
+	
+	// Convert choice to integer
+	choiceNum, err := strconv.Atoi(choice)
+	if err != nil {
+		return nil, fmt.Errorf("invalid choice: please enter a number")
+	}
+	
+	// Validate choice
+	if choiceNum < 1 || choiceNum > len(friends.Friends) {
+		return nil, fmt.Errorf("invalid choice: please select a number between 1 and %d", len(friends.Friends))
+	}
+	
+	// Return selected friend (subtract 1 for 0-based indexing)
+	selectedFriend := &friends.Friends[choiceNum-1]
+	fmt.Printf("Selected: %s\n", selectedFriend.Username)
+	
+	return selectedFriend, nil
 }
 
 // sendMessage sends a message using the API
