@@ -173,16 +173,26 @@ func waitForCtrlR(token *TokenData, requests []IncomingFriendRequest) {
 
 // handleFriendRequestResponse handles the friend request response flow
 func handleFriendRequestResponse(token *TokenData, requests []IncomingFriendRequest) {
-	if len(requests) == 0 {
-		fmt.Println("\nNo pending friend requests to respond to.")
+	// Filter requests that can be responded to (pending or rejected status)
+	var respondableRequests []IncomingFriendRequest
+	for _, request := range requests {
+		if strings.ToLower(request.Status) == "pending" || strings.ToLower(request.Status) == "rejected" {
+			respondableRequests = append(respondableRequests, request)
+		}
+	}
+	
+	if len(respondableRequests) == 0 {
+		fmt.Println("\nNo pending or rejected friend requests to respond to.")
+		fmt.Println("Only requests with 'pending' or 'rejected' status can be responded to.")
 		return
 	}
 
 	fmt.Println("\n=== Respond to Friend Requests ===")
-	fmt.Println("Available requests:")
+	fmt.Println("Available requests (pending/rejected only):")
 	
-	for i, request := range requests {
-		fmt.Printf("%d. From: %s (Request ID: %d)\n", i+1, request.SenderUsername, request.RequestID)
+	for i, request := range respondableRequests {
+		fmt.Printf("%d. From: %s (Status: %s, Request ID: %d)\n", 
+			i+1, request.SenderUsername, request.Status, request.RequestID)
 	}
 	
 	fmt.Print("\nEnter the number of the request to respond to: ")
@@ -195,12 +205,12 @@ func handleFriendRequestResponse(token *TokenData, requests []IncomingFriendRequ
 	
 	input = strings.TrimSpace(input)
 	requestIndex, err := strconv.Atoi(input)
-	if err != nil || requestIndex < 1 || requestIndex > len(requests) {
+	if err != nil || requestIndex < 1 || requestIndex > len(respondableRequests) {
 		fmt.Println("Invalid request number.")
 		return
 	}
 	
-	selectedRequest := requests[requestIndex-1]
+	selectedRequest := respondableRequests[requestIndex-1]
 	
 	fmt.Printf("\nSelected request from: %s\n", selectedRequest.SenderUsername)
 	fmt.Println("1. Accept")

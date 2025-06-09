@@ -36,7 +36,6 @@ func friend() error {
 
 	configDir := filepath.Join(homeDir, ".config", "chat_app")
 	tokenPath := filepath.Join(configDir, "token.json")
-	friendsPath := filepath.Join(configDir, "friends.json")
 
 	// Read token from file
 	token, err := readToken(tokenPath)
@@ -52,16 +51,11 @@ func friend() error {
 		os.Exit(1)
 	}
 
+	// Display user information
 	fmt.Printf("User found: %s (ID: %s)\n", userInfo.UserData.Username, userInfo.UserData.UserID)
-
-	// Add user to friends list
-	err = addFriend(friendsPath, userInfo.UserData.UserID, userInfo.UserData.Username)
-	if err != nil {
-		fmt.Printf("Error adding friend: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Successfully added %s to friends list!\n", userInfo.UserData.Username)
+	fmt.Printf("Search performed by: %s\n", userInfo.SearchedBy)
+	fmt.Printf("Search timestamp: %s\n", userInfo.Timestamp)
+	
 	return nil
 }
 
@@ -120,52 +114,4 @@ func searchUser(username, token string) (*APIResponse, error) {
 	}
 
 	return &apiResponse, nil
-}
-
-func addFriend(friendsPath, userID, username string) error {
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(friendsPath)
-	err := os.MkdirAll(dir, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	// Read existing friends data
-	var friendsData FriendsData
-	if file, err := os.Open(friendsPath); err == nil {
-		defer file.Close()
-		decoder := json.NewDecoder(file)
-		decoder.Decode(&friendsData) // Ignore error for empty/invalid file
-	}
-
-	// Check if friend already exists
-	for _, friend := range friendsData.Friends {
-		if friend.UserID == userID {
-			return fmt.Errorf("user %s is already in friends list", username)
-		}
-	}
-
-	// Add new friend
-	newFriend := Friend{
-		UserID:   userID,
-		Username: username,
-		AddedAt:  time.Now().Format(time.RFC3339),
-	}
-	friendsData.Friends = append(friendsData.Friends, newFriend)
-
-	// Write updated friends data
-	file, err := os.Create(friendsPath)
-	if err != nil {
-		return fmt.Errorf("failed to create friends file: %w", err)
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	err = encoder.Encode(friendsData)
-	if err != nil {
-		return fmt.Errorf("failed to encode friends JSON: %w", err)
-	}
-
-	return nil
 }
