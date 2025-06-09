@@ -19,14 +19,44 @@ type APIResponse struct {
 	} `json:"user_data"`
 }
 
-// Friend represents a friend entry
+// Friend represents a friend entry (unified structure for compatibility)
 type Friend struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	AddedAt  string `json:"added_at"`
+	// API response fields
+	FriendID       string `json:"friend_id"`
+	FriendUsername string `json:"friend_username"`
+	FriendshipDate string `json:"friendship_date"`
+	FriendshipID   int    `json:"friendship_id"`
+	
+	// Legacy/alternative fields for backward compatibility
+	UserID   string `json:"user_id,omitempty"`
+	Username string `json:"username,omitempty"`
 }
 
-// FriendsData represents the structure of friends.json
+// GetUserID returns the appropriate user ID field
+func (f *Friend) GetUserID() string {
+	if f.FriendID != "" {
+		return f.FriendID
+	}
+	return f.UserID
+}
+
+// GetUsername returns the appropriate username field
+func (f *Friend) GetUsername() string {
+	if f.FriendUsername != "" {
+		return f.FriendUsername
+	}
+	return f.Username
+}
+
+// FriendsAPIResponse represents the API response for get_friends endpoint
+type FriendsAPIResponse struct {
+	Friends      []Friend `json:"friends"`
+	TotalFriends int      `json:"total_friends"`
+	UserID       string   `json:"user_id"`
+	Username     string   `json:"username"`
+}
+
+// FriendsData represents the structure of friends.json (kept for backward compatibility)
 type FriendsData struct {
 	Friends []Friend `json:"friends"`
 }

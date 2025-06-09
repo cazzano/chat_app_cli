@@ -11,12 +11,10 @@ import (
 	"strconv"
 )
 
-// All types are now defined in types.go
-
-func send_message() error{
+func send_message() error {
 	// Check if message argument is provided
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run main.go \"Your message here\"")
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: go run main.go send \"Your message here\"")
 		os.Exit(1)
 	}
 
@@ -29,10 +27,10 @@ func send_message() error{
 		os.Exit(1)
 	}
 
-	// Read friends from config file
-	friends, err := readFriendsFromConfig()
+	// Fetch friends from API instead of local file
+	friends, err := fetchFriendsFromAPI(token.Token)
 	if err != nil {
-		fmt.Printf("Error reading friends: %v\n", err)
+		fmt.Printf("Error fetching friends: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -49,14 +47,15 @@ func send_message() error{
 		os.Exit(1)
 	}
 
-	// Send message to selected friend
-	err = sendMessage(token.Token, message, selectedFriend.UserID)
+	// Send message to selected friend using the appropriate ID field
+	recipientID := selectedFriend.GetUserID()
+	err = sendMessage(token.Token, message, recipientID)
 	if err != nil {
 		fmt.Printf("Error sending message: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Message sent successfully to %s!\n", selectedFriend.Username)
+	fmt.Printf("Message sent successfully to %s!\n", selectedFriend.GetUsername())
 	return nil
 }
 
@@ -68,7 +67,7 @@ func readTokenFromConfig() (*TokenData, error) {
 	}
 
 	tokenPath := filepath.Join(homeDir, ".config", "chat_app", "token.json")
-	
+
 	file, err := os.Open(tokenPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open token file: %v", err)
@@ -89,61 +88,83 @@ func readTokenFromConfig() (*TokenData, error) {
 	return &tokenData, nil
 }
 
-// readFriendsFromConfig reads the friends list from ~/.config/chat_app/friends.json
-func readFriendsFromConfig() (*FriendsData, error) {
-	homeDir, err := os.UserHomeDir()
+// fetchFriendsFromAPI fetches the friends list from the API
+func fetchFriendsFromAPI(token string) (*FriendsData, error) {
+	// Create HTTP request
+	req, err := http.NewRequest("GET", "http://localhost:2000/auth/get_friends", nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %v", err)
+		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	friendsPath := filepath.Join(homeDir, ".config", "chat_app", "friends.json")
-	
-	file, err := os.Open(friendsPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open friends file: %v", err)
-	}
-	defer file.Close()
+	// Set headers
+	req.Header.Set("Authorization", "Bearer "+token)
 
-	data, err := io.ReadAll(file)
+	// Send request
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read friends file: %v", err)
+		return nil, fmt.Errorf("failed to send request: %v", err)
 	}
+	defer resp.Body.Close()
 
-	var friendsData FriendsData
-	err = json.Unmarshal(data, &friendsData)
+	// Read response
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse friends file: %v", err)
+		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
 
-	return &friendsData, nil
+	// Check if request was successful
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var apiResponse FriendsAPIResponse
+	err = json.Unmarshal(body, &apiResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	// Convert to FriendsData format for compatibility
+	friendsData := &FriendsData{
+		Friends: apiResponse.Friends,
+	}
+
+	return friendsData, nil
 }
 
 // selectFriend displays the friends list and asks user to select one
 func selectFriend(friends *FriendsData) (*Friend, error) {
 	fmt.Println("\n--- Your Friends ---")
 	for i, friend := range friends.Friends {
-		fmt.Printf("%d. %s (ID: %s)\n", i+1, friend.Username, friend.UserID)
+		username := friend.GetUsername()
+		userID := friend.GetUserID()
+		friendshipDate := friend.FriendshipDate
+		if friendshipDate == "" {
+			friendshipDate = "Unknown"
+		}
+		fmt.Printf("%d. %s (ID: %s) - Added: %s\n", i+1, username, userID, friendshipDate)
 	}
-	
+
 	fmt.Print("\nEnter the number of the friend you want to send the message to: ")
 	var choice string
 	fmt.Scanln(&choice)
-	
+
 	// Convert choice to integer
 	choiceNum, err := strconv.Atoi(choice)
 	if err != nil {
 		return nil, fmt.Errorf("invalid choice: please enter a number")
 	}
-	
+
 	// Validate choice
 	if choiceNum < 1 || choiceNum > len(friends.Friends) {
 		return nil, fmt.Errorf("invalid choice: please select a number between 1 and %d", len(friends.Friends))
 	}
-	
+
 	// Return selected friend (subtract 1 for 0-based indexing)
 	selectedFriend := &friends.Friends[choiceNum-1]
-	fmt.Printf("Selected: %s\n", selectedFriend.Username)
-	
+	fmt.Printf("Selected: %s\n", selectedFriend.GetUsername())
+
 	return selectedFriend, nil
 }
 

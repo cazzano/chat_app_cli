@@ -38,10 +38,10 @@ func receive_message() error {
 		os.Exit(1)
 	}
 
-	// Read friends from config file
-	friends, err := readFriendsForReceiveMessage()
+	// Fetch friends from API instead of local file for consistency
+	friends, err := fetchFriendsFromAPI(token.Token)
 	if err != nil {
-		fmt.Printf("Error reading friends: %v\n", err)
+		fmt.Printf("Error fetching friends: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -97,6 +97,7 @@ func readTokenForReceiveMessage() (*TokenData, error) {
 }
 
 // readFriendsForReceiveMessage reads the friends list from ~/.config/chat_app/friends.json
+// Kept for backward compatibility but now also supports API fetching
 func readFriendsForReceiveMessage() (*FriendsData, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -129,7 +130,9 @@ func readFriendsForReceiveMessage() (*FriendsData, error) {
 func selectFriendForReceiveMessage(friends *FriendsData) (*Friend, error) {
 	fmt.Println("\n--- Your Friends ---")
 	for i, friend := range friends.Friends {
-		fmt.Printf("%d. %s (ID: %s)\n", i+1, friend.Username, friend.UserID)
+		username := friend.GetUsername()
+		userID := friend.GetUserID()
+		fmt.Printf("%d. %s (ID: %s)\n", i+1, username, userID)
 	}
 	
 	fmt.Print("\nEnter the number of the friend whose conversation you want to view: ")
@@ -149,15 +152,16 @@ func selectFriendForReceiveMessage(friends *FriendsData) (*Friend, error) {
 	
 	// Return selected friend (subtract 1 for 0-based indexing)
 	selectedFriend := &friends.Friends[choiceNum-1]
-	fmt.Printf("Selected: %s\n", selectedFriend.Username)
+	fmt.Printf("Selected: %s\n", selectedFriend.GetUsername())
 	
 	return selectedFriend, nil
 }
 
 // fetchConversation fetches and displays the conversation with the selected friend
 func fetchConversation(token *TokenData, friend *Friend) error {
-	// Build API URL
-	url := fmt.Sprintf("http://localhost:2000/auth/conversation/%s", friend.UserID)
+	// Build API URL using the appropriate user ID
+	friendUserID := friend.GetUserID()
+	url := fmt.Sprintf("http://localhost:2000/auth/conversation/%s", friendUserID)
 	
 	// Create HTTP request
 	req, err := http.NewRequest("GET", url, nil)
@@ -202,7 +206,10 @@ func fetchConversation(token *TokenData, friend *Friend) error {
 
 // displayConversation displays the filtered conversation between you and the selected friend
 func displayConversation(token *TokenData, friend *Friend, conversation *ConversationResponse) {
-	fmt.Printf("\n=== Conversation with %s ===\n", friend.Username)
+	friendUsername := friend.GetUsername()
+	friendUserID := friend.GetUserID()
+	
+	fmt.Printf("\n=== Conversation with %s ===\n", friendUsername)
 	fmt.Printf("Total messages in conversation: %d\n", conversation.TotalMessages)
 	fmt.Printf("Participants: %v\n", conversation.Participants)
 	fmt.Println(strings.Repeat("=", 50))
@@ -213,18 +220,18 @@ func displayConversation(token *TokenData, friend *Friend, conversation *Convers
 		// Only include messages where either:
 		// - You sent to this friend (sender = your ID, recipient = friend ID)
 		// - This friend sent to you (sender = friend ID, recipient = your ID)
-		if (msg.Sender == token.UserID && msg.Recipient == friend.UserID) ||
-		   (msg.Sender == friend.UserID && msg.Recipient == token.UserID) {
+		if (msg.Sender == token.UserID && msg.Recipient == friendUserID) ||
+		   (msg.Sender == friendUserID && msg.Recipient == token.UserID) {
 			filteredMessages = append(filteredMessages, msg)
 		}
 	}
 
 	if len(filteredMessages) == 0 {
-		fmt.Printf("No messages found between you and %s.\n", friend.Username)
+		fmt.Printf("No messages found between you and %s.\n", friendUsername)
 		return
 	}
 
-	fmt.Printf("\nMessages between you and %s (%d messages):\n\n", friend.Username, len(filteredMessages))
+	fmt.Printf("\nMessages between you and %s (%d messages):\n\n", friendUsername, len(filteredMessages))
 
 	// Display filtered messages
 	for _, msg := range filteredMessages {
@@ -248,7 +255,7 @@ func displayConversation(token *TokenData, friend *Friend, conversation *Convers
 			}
 		} else {
 			// Message received from friend
-			fmt.Printf("📥 [%s] %s: %s\n", timeStr, friend.Username, msg.Message)
+			fmt.Printf("📥 [%s] %s: %s\n", timeStr, friendUsername, msg.Message)
 			if !msg.IsRead {
 				fmt.Printf("   Status: Unread\n")
 			} else {
@@ -260,5 +267,5 @@ func displayConversation(token *TokenData, friend *Friend, conversation *Convers
 		fmt.Println(strings.Repeat("-", 40))
 	}
 
-	fmt.Printf("\nEnd of conversation with %s\n", friend.Username)
+	fmt.Printf("\nEnd of conversation with %s\n", friendUsername)
 }
