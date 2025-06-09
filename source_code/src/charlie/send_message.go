@@ -11,49 +11,16 @@ import (
 	"strconv"
 )
 
-// TokenData represents the structure of the token file
-type TokenData struct {
-	Token     string `json:"token"`
-	ExpiresIn string `json:"expires_in"`
-	UserID    string `json:"user_id"`
-	Username  string `json:"username"`
-}
+// All types are now defined in types.go
 
-// Friend represents a friend in the friends list
-type Friend struct {
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	AddedAt  string `json:"added_at"`
-}
-
-// FriendsData represents the structure of the friends file
-type FriendsData struct {
-	Friends []Friend `json:"friends"`
-}
-
-// MessageRequest represents the request payload for sending a message
-type MessageRequest struct {
-	Message           string `json:"message"`
-	RecipientUserID   string `json:"recipient_user_id"`
-}
-
-// MessageResponse represents the API response
-type MessageResponse struct {
-	Message     string `json:"message"`
-	MessageID   int    `json:"message_id"`
-	Recipient   string `json:"recipient"`
-	Sender      string `json:"sender"`
-	Timestamp   string `json:"timestamp"`
-}
-
-func main() {
+func send_message() error{
 	// Check if message argument is provided
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run main.go \"Your message here\"")
 		os.Exit(1)
 	}
 
-	message := os.Args[1]
+	message := os.Args[2]
 
 	// Read token from config file
 	token, err := readTokenFromConfig()
@@ -90,6 +57,7 @@ func main() {
 	}
 
 	fmt.Printf("Message sent successfully to %s!\n", selectedFriend.Username)
+	return nil
 }
 
 // readTokenFromConfig reads the token from ~/.config/chat_app/token.json

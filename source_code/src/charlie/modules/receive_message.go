@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 )
 
 // TokenData represents the structure of the token file
@@ -31,14 +32,10 @@ type FriendsData struct {
 	Friends []Friend `json:"friends"`
 }
 
-// MessageRequest represents the request payload for sending a message
-type MessageRequest struct {
-	Message           string `json:"message"`
-	RecipientUserID   string `json:"recipient_user_id"`
-}
-
-// MessageResponse represents the API response
-type MessageResponse struct {
+// Message represents a single message in the conversation
+type Message struct {
+	Direction   string `json:"direction"`
+	IsRead      bool   `json:"is_read"`
 	Message     string `json:"message"`
 	MessageID   int    `json:"message_id"`
 	Recipient   string `json:"recipient"`
@@ -46,15 +43,14 @@ type MessageResponse struct {
 	Timestamp   string `json:"timestamp"`
 }
 
+// ConversationResponse represents the API response for conversation
+type ConversationResponse struct {
+	Conversation  []Message `json:"conversation"`
+	Participants  []string  `json:"participants"`
+	TotalMessages int       `json:"total_messages"`
+}
+
 func main() {
-	// Check if message argument is provided
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run main.go \"Your message here\"")
-		os.Exit(1)
-	}
-
-	message := os.Args[1]
-
 	// Read token from config file
 	token, err := readTokenFromConfig()
 	if err != nil {
@@ -82,14 +78,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Send message to selected friend
-	err = sendMessage(token.Token, message, selectedFriend.UserID)
+	// Fetch conversation with selected friend
+	err = fetchConversation(token, selectedFriend)
 	if err != nil {
-		fmt.Printf("Error sending message: %v\n", err)
+		fmt.Printf("Error fetching conversation: %v\n", err)
 		os.Exit(1)
 	}
-
-	fmt.Printf("Message sent successfully to %s!\n", selectedFriend.Username)
 }
 
 // readTokenFromConfig reads the token from ~/.config/chat_app/token.json
@@ -157,7 +151,7 @@ func selectFriend(friends *FriendsData) (*Friend, error) {
 		fmt.Printf("%d. %s (ID: %s)\n", i+1, friend.Username, friend.UserID)
 	}
 	
-	fmt.Print("\nEnter the number of the friend you want to send the message to: ")
+	fmt.Print("\nEnter the number of the friend whose conversation you want to view: ")
 	var choice string
 	fmt.Scanln(&choice)
 	
@@ -179,28 +173,19 @@ func selectFriend(friends *FriendsData) (*Friend, error) {
 	return selectedFriend, nil
 }
 
-// sendMessage sends a message using the API
-func sendMessage(token, message, recipientUID string) error {
-	// Prepare request payload
-	messageReq := MessageRequest{
-		Message:         message,
-		RecipientUserID: recipientUID,
-	}
-
-	jsonData, err := json.Marshal(messageReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request: %v", err)
-	}
-
+// fetchConversation fetches and displays the conversation with the selected friend
+func fetchConversation(token *TokenData, friend *Friend) error {
+	// Build API URL
+	url := fmt.Sprintf("http://localhost:2000/auth/conversation/%s", friend.UserID)
+	
 	// Create HTTP request
-	req, err := http.NewRequest("POST", "http://localhost:2000/auth/send_message", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}
 
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	// Set authorization header
+	req.Header.Set("Authorization", "Bearer "+token.Token)
 
 	// Send request
 	client := &http.Client{}
@@ -221,21 +206,78 @@ func sendMessage(token, message, recipientUID string) error {
 		return fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
-	// Parse and display response
-	var messageResp MessageResponse
-	err = json.Unmarshal(body, &messageResp)
+	// Parse response
+	var conversation ConversationResponse
+	err = json.Unmarshal(body, &conversation)
 	if err != nil {
-		fmt.Printf("Response: %s\n", string(body))
-		return nil
+		return fmt.Errorf("failed to parse response: %v", err)
 	}
 
-	// Display formatted response
-	fmt.Printf("\n--- Message Details ---\n")
-	fmt.Printf("Message ID: %d\n", messageResp.MessageID)
-	fmt.Printf("From: %s\n", messageResp.Sender)
-	fmt.Printf("To: %s\n", messageResp.Recipient)
-	fmt.Printf("Timestamp: %s\n", messageResp.Timestamp)
-	fmt.Printf("Status: %s\n", messageResp.Message)
-
+	// Display conversation
+	displayConversation(token, friend, &conversation)
+	
 	return nil
+}
+
+// displayConversation displays the filtered conversation between you and the selected friend
+func displayConversation(token *TokenData, friend *Friend, conversation *ConversationResponse) {
+	fmt.Printf("\n=== Conversation with %s ===\n", friend.Username)
+	fmt.Printf("Total messages in conversation: %d\n", conversation.TotalMessages)
+	fmt.Printf("Participants: %v\n", conversation.Participants)
+	fmt.Println(strings.Repeat("=", 50))
+
+	// Filter messages between you and the selected friend only
+	var filteredMessages []Message
+	for _, msg := range conversation.Conversation {
+		// Only include messages where either:
+		// - You sent to this friend (sender = your ID, recipient = friend ID)
+		// - This friend sent to you (sender = friend ID, recipient = your ID)
+		if (msg.Sender == token.UserID && msg.Recipient == friend.UserID) ||
+		   (msg.Sender == friend.UserID && msg.Recipient == token.UserID) {
+			filteredMessages = append(filteredMessages, msg)
+		}
+	}
+
+	if len(filteredMessages) == 0 {
+		fmt.Printf("No messages found between you and %s.\n", friend.Username)
+		return
+	}
+
+	fmt.Printf("\nMessages between you and %s (%d messages):\n\n", friend.Username, len(filteredMessages))
+
+	// Display filtered messages
+	for _, msg := range filteredMessages {
+		// Parse timestamp
+		timestamp, err := time.Parse("2006-01-02 15:04:05", msg.Timestamp)
+		var timeStr string
+		if err != nil {
+			timeStr = msg.Timestamp // Use original if parsing fails
+		} else {
+			timeStr = timestamp.Format("Jan 2, 2006 at 3:04 PM")
+		}
+
+		// Determine message direction and display accordingly
+		if msg.Sender == token.UserID {
+			// Message sent by you
+			fmt.Printf("📤 [%s] You: %s\n", timeStr, msg.Message)
+			if !msg.IsRead {
+				fmt.Printf("   Status: Delivered\n")
+			} else {
+				fmt.Printf("   Status: Read\n")
+			}
+		} else {
+			// Message received from friend
+			fmt.Printf("📥 [%s] %s: %s\n", timeStr, friend.Username, msg.Message)
+			if !msg.IsRead {
+				fmt.Printf("   Status: Unread\n")
+			} else {
+				fmt.Printf("   Status: Read\n")
+			}
+		}
+		
+		fmt.Printf("   Message ID: %d\n", msg.MessageID)
+		fmt.Println(strings.Repeat("-", 40))
+	}
+
+	fmt.Printf("\nEnd of conversation with %s\n", friend.Username)
 }
