@@ -63,6 +63,16 @@ func main() {
 		}
 		fmt.Println("Message received successfully!")
 
+       case "requests":
+                                
+		err := manageFriendRequests()
+		if err != nil {
+			fmt.Printf("Requests failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Requests received successfully!")
+
+
 
 
 
