@@ -125,7 +125,7 @@ func searchUser(username, token string) (*APIResponse, error) {
 	}
 
 	// Create request
-	req, err := http.NewRequest("GET", "http://localhost:2000/auth/search_user", nil)
+	req, err := http.NewRequest("GET", "https://wasal-backend.onrender.com/auth/search_user", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -176,7 +176,7 @@ func sendFriendRequest(username, token string) error {
 	}
 
 	// Create request
-	req, err := http.NewRequest("POST", "http://localhost:2000/auth/send_friend_request", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://wasal-backend.onrender.com/auth/send_friend_request", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

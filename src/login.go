@@ -42,7 +42,7 @@ func login_() error {
 	client := &http.Client{}
 	
 	// Create request
-	req, err := http.NewRequest("POST", "http://localhost:2000/login", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://wasal-backend.onrender.com/login", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}
