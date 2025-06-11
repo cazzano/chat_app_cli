@@ -112,7 +112,7 @@ func getPassword() (string, error) {
 // registerUser sends registration request to the API
 func registerUser(username, password string) error {
 	// API endpoint
-	url := "http://localhost:5000/register"
+	url := "http://localhost:2000/register"
 
 	// Create HTTP request
 	req, err := http.NewRequest("POST", url, nil)
