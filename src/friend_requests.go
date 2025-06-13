@@ -105,7 +105,7 @@ func displayFriendRequestMenu() (int, error) {
 func handleIncomingRequests(token *TokenData) error {
 	fmt.Println("\n📥 Fetching incoming friend requests...")
 	
-	url := "https://wasal-backend.onrender.com/auth/get_incoming_friend_requests"
+	url := "https://p2gqr4-5000.csb.app/auth/get_incoming_friend_requests"
 	
 	requests, err := fetchIncomingFriendRequests(token, url)
 	if err != nil {
@@ -125,7 +125,7 @@ func handleIncomingRequests(token *TokenData) error {
 func handleOutgoingRequests(token *TokenData) error {
 	fmt.Println("\n📤 Fetching outgoing friend requests...")
 	
-	url := "https://wasal-backend.onrender.com/auth/get_outgoing_friend_requests"
+	url := "https://p2gqr4-5000.csb.app/auth/get_outgoing_friend_requests"
 	
 	requests, err := fetchOutgoingFriendRequests(token, url)
 	if err != nil {
@@ -250,7 +250,7 @@ func handleFriendRequestResponse(token *TokenData, requests []IncomingFriendRequ
 
 // respondToFriendRequest sends the response to the friend request API
 func respondToFriendRequest(token *TokenData, username, action string) error {
-	url := "https://wasal-backend.onrender.com/auth/respond_friend_request"
+	url := "https://p2gqr4-5000.csb.app/auth/respond_friend_request"
 	
 	requestData := map[string]string{
 		"username": username,

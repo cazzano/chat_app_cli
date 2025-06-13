@@ -112,7 +112,7 @@ func getPassword() (string, error) {
 // registerUser sends registration request to the API
 func registerUser(username, password string) error {
 	// API endpoint
-	url := "https://wasal-backend.onrender.com/register"
+	url := "https://p2gqr4-5000.csb.app/register"
 
 	// Create HTTP request
 	req, err := http.NewRequest("POST", url, nil)
