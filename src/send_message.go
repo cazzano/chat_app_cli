@@ -91,7 +91,7 @@ func readTokenFromConfig() (*TokenData, error) {
 // fetchFriendsFromAPI fetches the friends list from the API
 func fetchFriendsFromAPI(token string) (*FriendsData, error) {
 	// Create HTTP request
-	req, err := http.NewRequest("GET", "https://p2gqr4-5000.csb.app/auth/get_friends", nil)
+	req, err := http.NewRequest("GET", "https://wasalbackend-production.up.railway.app/auth/get_friends", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
@@ -182,7 +182,7 @@ func sendMessage(token, message, recipientUID string) error {
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequest("POST", "https://p2gqr4-5000.csb.app/auth/send_message", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://wasalbackend-production.up.railway.app/auth/send_message", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}

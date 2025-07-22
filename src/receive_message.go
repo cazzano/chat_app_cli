@@ -281,7 +281,7 @@ func selectFriendForReceiveMessage(friends *FriendsData) (*Friend, error) {
 func fetchConversation(token *TokenData, friend *Friend) error {
 	// Build API URL using the appropriate user ID
 	friendUserID := friend.GetUserID()
-	url := fmt.Sprintf("https://p2gqr4-5000.csb.app/auth/conversation/%s", friendUserID)
+	url := fmt.Sprintf("https://wasalbackend-production.up.railway.app/auth/conversation/%s", friendUserID)
 	
 	// Create HTTP request
 	req, err := http.NewRequest("GET", url, nil)
@@ -448,7 +448,7 @@ func sendMessageToFriend(token, message, recipientUID string) error {
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequest("POST", "https://p2gqr4-5000.csb.app/auth/send_message", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://wasalbackend-production.up.railway.app/auth/send_message", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}

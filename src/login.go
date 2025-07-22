@@ -42,7 +42,7 @@ func login_() error {
 	client := &http.Client{}
 	
 	// Create request
-	req, err := http.NewRequest("POST", "https://p2gqr4-5000.csb.app/login", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "https://wasalbackend-production.up.railway.app/login", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}
